@@ -1,77 +1,187 @@
-import { FrameViewer } from './frameViewer';
+import { ImageProcessor, ProcessingOptions } from './utils/imageProcessor';
 
-document.addEventListener('DOMContentLoaded', () => {
-    const viewer = new FrameViewer('imageCanvas');
-    const fileInput = document.getElementById('fileInput') as HTMLInputElement;
-    const fileName = document.getElementById('fileName') as HTMLSpanElement;
-    const toggleEdgeDetection = document.getElementById('toggleEdgeDetection') as HTMLButtonElement;
-    const toggleGrayscale = document.getElementById('toggleGrayscale') as HTMLButtonElement;
-    const resolutionElement = document.getElementById('resolution') as HTMLSpanElement;
-    const fpsElement = document.getElementById('fps') as HTMLSpanElement;
-    const processingTimeElement = document.getElementById('processingTime') as HTMLSpanElement;
+class App {
+    private canvas: HTMLCanvasElement;
+    private imageProcessor: ImageProcessor;
+    private currentImage: HTMLImageElement | null = null;
+    private processingOptions: ProcessingOptions = {
+        threshold1: 50,
+        threshold2: 150,
+        blurSize: 5,
+        grayscale: false,
+        edgeDetection: false
+    };
+    private isProcessing = false;
+    private lastFrameTime = 0;
+    private frameCount = 0;
+    private fps = 0;
 
-    // Threshold sliders
-    const threshold1Slider = document.getElementById('threshold1') as HTMLInputElement;
-    const threshold2Slider = document.getElementById('threshold2') as HTMLInputElement;
-    const blurSizeSlider = document.getElementById('blurSize') as HTMLInputElement;
-    const threshold1Value = document.getElementById('threshold1Value') as HTMLSpanElement;
-    const threshold2Value = document.getElementById('threshold2Value') as HTMLSpanElement;
-    const blurSizeValue = document.getElementById('blurSizeValue') as HTMLSpanElement;
-
-    // Handle file input changes
-    fileInput.addEventListener('change', async (e) => {
-        const file = (e.target as HTMLInputElement).files?.[0];
-        if (file) {
-            fileName.textContent = file.name;
-            await viewer.loadImage(file);
-            toggleEdgeDetection.disabled = false;
-            toggleGrayscale.disabled = false;
-            updateStats();
-        }
-    });
-
-    // Handle edge detection toggle
-    toggleEdgeDetection.addEventListener('click', () => {
-        viewer.toggleEdgeDetection();
-        const isActive = toggleEdgeDetection.classList.toggle('active');
-        toggleEdgeDetection.textContent = `Edge Detection: ${isActive ? 'On' : 'Off'}`;
-    });
-
-    // Handle grayscale toggle
-    toggleGrayscale.addEventListener('click', () => {
-        viewer.toggleGrayscale();
-        const isActive = toggleGrayscale.classList.toggle('active');
-        toggleGrayscale.textContent = `Grayscale: ${isActive ? 'On' : 'Off'}`;
-    });
-
-    // Handle slider changes
-    threshold1Slider.addEventListener('input', (e) => {
-        const value = (e.target as HTMLInputElement).value;
-        threshold1Value.textContent = value;
-        viewer.setProcessingOptions({ threshold1: parseInt(value) });
-    });
-
-    threshold2Slider.addEventListener('input', (e) => {
-        const value = (e.target as HTMLInputElement).value;
-        threshold2Value.textContent = value;
-        viewer.setProcessingOptions({ threshold2: parseInt(value) });
-    });
-
-    blurSizeSlider.addEventListener('input', (e) => {
-        const value = (e.target as HTMLInputElement).value;
-        blurSizeValue.textContent = value;
-        viewer.setProcessingOptions({ blurSize: parseInt(value) });
-    });
-
-    // Update stats periodically
-    function updateStats() {
-        const stats = viewer.getStats();
-        resolutionElement.textContent = `${stats.width}x${stats.height}`;
-        fpsElement.textContent = stats.fps.toString();
-        processingTimeElement.textContent = viewer.getProcessingTime().toString();
-        requestAnimationFrame(updateStats);
+    constructor() {
+        this.canvas = document.getElementById('imageCanvas') as HTMLCanvasElement;
+        this.imageProcessor = new ImageProcessor(this.canvas);
+        this.setupEventListeners();
+        this.updateFPS();
     }
 
-    // Start stats update loop
-    updateStats();
+    private setupEventListeners() {
+        // File input
+        const fileInput = document.getElementById('fileInput') as HTMLInputElement;
+        fileInput.addEventListener('change', this.handleFileSelect.bind(this));
+
+        // Toggle buttons
+        const edgeDetectionBtn = document.getElementById('toggleEdgeDetection') as HTMLButtonElement;
+        const grayscaleBtn = document.getElementById('toggleGrayscale') as HTMLButtonElement;
+
+        edgeDetectionBtn.addEventListener('click', () => {
+            this.processingOptions.edgeDetection = !this.processingOptions.edgeDetection;
+            edgeDetectionBtn.textContent = `Edge Detection: ${this.processingOptions.edgeDetection ? 'On' : 'Off'}`;
+            edgeDetectionBtn.classList.toggle('active', this.processingOptions.edgeDetection);
+            this.processImage();
+        });
+
+        grayscaleBtn.addEventListener('click', () => {
+            this.processingOptions.grayscale = !this.processingOptions.grayscale;
+            grayscaleBtn.textContent = `Grayscale: ${this.processingOptions.grayscale ? 'On' : 'Off'}`;
+            grayscaleBtn.classList.toggle('active', this.processingOptions.grayscale);
+            this.processImage();
+        });
+
+        // Sliders
+        const threshold1Input = document.getElementById('threshold1') as HTMLInputElement;
+        const threshold2Input = document.getElementById('threshold2') as HTMLInputElement;
+        const blurSizeInput = document.getElementById('blurSize') as HTMLInputElement;
+
+        [threshold1Input, threshold2Input, blurSizeInput].forEach(input => {
+            input.addEventListener('input', (e) => {
+                const target = e.target as HTMLInputElement;
+                const value = parseInt(target.value);
+                const valueSpan = document.getElementById(`${target.id}Value`);
+                if (valueSpan) valueSpan.textContent = value.toString();
+
+                switch (target.id) {
+                    case 'threshold1':
+                        this.processingOptions.threshold1 = value;
+                        break;
+                    case 'threshold2':
+                        this.processingOptions.threshold2 = value;
+                        break;
+                    case 'blurSize':
+                        this.processingOptions.blurSize = value;
+                        break;
+                }
+
+                this.processImage();
+            });
+        });
+
+        // Drag and drop
+        this.canvas.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.canvas.classList.add('drag-over');
+        });
+
+        this.canvas.addEventListener('dragleave', () => {
+            this.canvas.classList.remove('drag-over');
+        });
+
+        this.canvas.addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.canvas.classList.remove('drag-over');
+
+            const file = e.dataTransfer?.files[0];
+            if (file && file.type.startsWith('image/')) {
+                fileInput.files = e.dataTransfer?.files;
+                this.handleFileSelect({ target: fileInput } as any);
+            }
+        });
+    }
+
+    private async handleFileSelect(event: Event) {
+        const input = event.target as HTMLInputElement;
+        const file = input.files?.[0];
+
+        if (file) {
+            const fileNameSpan = document.getElementById('fileName');
+            if (fileNameSpan) fileNameSpan.textContent = file.name;
+
+            const img = new Image();
+            img.src = URL.createObjectURL(file);
+            await new Promise(resolve => img.onload = resolve);
+
+            this.currentImage = img;
+            this.canvas.width = img.width;
+            this.canvas.height = img.height;
+
+            const resolutionSpan = document.getElementById('resolution');
+            if (resolutionSpan) {
+                resolutionSpan.textContent = `${img.width}x${img.height}`;
+            }
+
+            this.processImage();
+        }
+    }
+
+    private async processImage() {
+        if (!this.currentImage || this.isProcessing) return;
+
+        this.isProcessing = true;
+        this.showLoading(true);
+
+        const ctx = this.canvas.getContext('2d');
+        if (!ctx) return;
+
+        // Draw original image
+        ctx.drawImage(this.currentImage, 0, 0);
+
+        // Get image data
+        const imageData = ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+
+        // Process image
+        const processedImageData = await this.imageProcessor.processImage(
+            imageData,
+            this.processingOptions
+        );
+
+        // Update canvas with processed image
+        ctx.putImageData(processedImageData, 0, 0);
+
+        // Update processing time
+        const processingTimeSpan = document.getElementById('processingTime');
+        if (processingTimeSpan) {
+            processingTimeSpan.textContent = this.imageProcessor.getProcessingTime().toString();
+        }
+
+        this.frameCount++;
+        const now = performance.now();
+        if (now - this.lastFrameTime >= 1000) {
+            this.fps = Math.round((this.frameCount * 1000) / (now - this.lastFrameTime));
+            this.frameCount = 0;
+            this.lastFrameTime = now;
+        }
+
+        this.isProcessing = false;
+        this.showLoading(false);
+    }
+
+    private showLoading(show: boolean) {
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        if (loadingOverlay) {
+            loadingOverlay.classList.toggle('hidden', !show);
+        }
+    }
+
+    private updateFPS() {
+        const fpsSpan = document.getElementById('fps');
+        if (fpsSpan) {
+            fpsSpan.textContent = this.fps.toString();
+        }
+        requestAnimationFrame(this.updateFPS.bind(this));
+    }
+}
+
+// Initialize app
+document.addEventListener('DOMContentLoaded', () => {
+    new App();
 });

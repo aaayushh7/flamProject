@@ -4,57 +4,70 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Edge Detector Web Viewer</title>
-    <link rel="stylesheet" href="/src/styles.css">
+    <link rel="stylesheet" href="/src/styles/main.css">
 </head>
 <body>
-    <div class="container">
-        <h1>Edge Detector Web Viewer</h1>
-        
-        <div class="viewer-container">
-            <div class="canvas-wrapper">
+    <div class="app">
+        <header class="header">
+            <h1>Edge Detector</h1>
+            <div class="fps-counter">FPS: <span id="fps">--</span></div>
+        </header>
+
+        <main class="main">
+            <div class="canvas-container">
                 <canvas id="imageCanvas"></canvas>
                 <div id="loadingOverlay" class="loading-overlay hidden">
                     <div class="spinner"></div>
                     <p>Processing...</p>
                 </div>
             </div>
+
+            <div class="controls">
+                <div class="control-group">
+                    <label for="fileInput" class="file-input-label">Choose Image</label>
+                    <input type="file" id="fileInput" accept="image/*" class="file-input">
+                    <span id="fileName" class="file-name"></span>
+                </div>
+
+                <div class="control-group">
+                    <button id="toggleEdgeDetection" class="button">Edge Detection: Off</button>
+                    <button id="toggleGrayscale" class="button">Grayscale: Off</button>
+                </div>
+
+                <div class="edge-controls">
+                    <div class="slider-group">
+                        <label for="threshold1">Lower Threshold</label>
+                        <div class="slider-container">
+                            <input type="range" id="threshold1" min="0" max="255" value="50">
+                            <span id="threshold1Value">50</span>
+                        </div>
+                    </div>
+
+                    <div class="slider-group">
+                        <label for="threshold2">Upper Threshold</label>
+                        <div class="slider-container">
+                            <input type="range" id="threshold2" min="0" max="255" value="150">
+                            <span id="threshold2Value">150</span>
+                        </div>
+                    </div>
+
+                    <div class="slider-group">
+                        <label for="blurSize">Blur Size</label>
+                        <div class="slider-container">
+                            <input type="range" id="blurSize" min="3" max="15" step="2" value="5">
+                            <span id="blurSizeValue">5</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer class="footer">
             <div class="stats">
                 <p>Resolution: <span id="resolution">--</span></p>
-                <p>FPS: <span id="fps">--</span></p>
                 <p>Processing Time: <span id="processingTime">--</span> ms</p>
             </div>
-        </div>
-
-        <div class="controls">
-            <div class="file-controls">
-                <input type="file" id="fileInput" accept="image/*" class="file-input">
-                <label for="fileInput" class="file-label">Choose Image</label>
-                <span id="fileName" class="file-name"></span>
-            </div>
-
-            <div class="processing-controls">
-                <button id="toggleEdgeDetection" class="button" disabled>Edge Detection: Off</button>
-                <button id="toggleGrayscale" class="button" disabled>Grayscale: Off</button>
-            </div>
-
-            <div class="slider-controls" id="edgeControls">
-                <div class="slider-group">
-                    <label for="threshold1">Lower Threshold</label>
-                    <input type="range" id="threshold1" min="0" max="255" value="50">
-                    <span id="threshold1Value">50</span>
-                </div>
-                <div class="slider-group">
-                    <label for="threshold2">Upper Threshold</label>
-                    <input type="range" id="threshold2" min="0" max="255" value="150">
-                    <span id="threshold2Value">150</span>
-                </div>
-                <div class="slider-group">
-                    <label for="blurSize">Blur Size</label>
-                    <input type="range" id="blurSize" min="3" max="15" step="2" value="5">
-                    <span id="blurSizeValue">5</span>
-                </div>
-            </div>
-        </div>
+        </footer>
     </div>
     <script type="module" src="/src/main.ts"></script>
 </body>
