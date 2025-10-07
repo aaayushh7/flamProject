@@ -30,7 +30,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-
+    // Handle edge detection toggle
+    toggleEdgeDetection.addEventListener('click', () => {
+        viewer.toggleEdgeDetection();
+        const isActive = toggleEdgeDetection.classList.toggle('active');
+        toggleEdgeDetection.textContent = `Edge Detection: ${isActive ? 'On' : 'Off'}`;
+    });
 
     // Handle grayscale toggle
     toggleGrayscale.addEventListener('click', () => {
